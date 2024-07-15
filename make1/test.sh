@@ -128,6 +128,269 @@ srv_005() {
     fi
 }
 
+srv_007() {
+    echo "Checking for vulnerable version of Postfix (srv-007):"
+
+    # Postfix 프로세스 확인
+    postfix_process=$(ps -ef | grep postfix | grep -v grep)
+    if [ -z "$postfix_process" ]; then
+        echo "Postfix service is not running."
+        return
+    else
+        echo "Postfix service is running:"
+        echo "$postfix_process"
+    fi
+
+    # Postfix 버전 확인
+    postfix_version=$(postconf mail_version | awk '{print $3}')
+    echo "Postfix version: $postfix_version"
+
+    # 취약한 버전 확인
+    vulnerable_version="2.10.1"
+    if [ "$postfix_version" == "$vulnerable_version" ]; then
+        echo "Warning: You are using a vulnerable version of Postfix ($postfix_version)."
+        echo "It is recommended to upgrade to a newer version."
+
+        read -p "Do you want to upgrade Postfix now? (yes/no): " response
+        if [ "$response" == "yes" ]; then
+            # 업그레이드 명령어 (예: yum 사용)
+            echo "Upgrading Postfix..."
+            echo "YUM 을 사용할 수 없습니다"
+            # yum update postfix -y
+            # echo "Postfix upgraded. Please check the version again."
+        else
+            echo "Skipped upgrading Postfix."
+        fi
+    else
+        echo "Postfix version is not vulnerable."
+    fi
+}
+
+
+srv_010() {
+    echo "Checking Postfix mail queue processing permissions (srv-010):"
+
+    # Postfix 프로세스 확인
+    postfix_process=$(ps -ef | grep postfix | grep -v grep)
+    if [ -z "$postfix_process" ]; then
+        echo "Postfix service is not running."
+        return
+    else
+        echo "Postfix service is running:"
+        echo "$postfix_process"
+    fi
+
+    # postsuper 파일 권한 확인
+    postsuper_path="/usr/sbin/postsuper"
+    if [ -f "$postsuper_path" ]; then
+        echo "$postsuper_path exists."
+        ls -l $postsuper_path
+        postsuper_permissions=$(stat -c %A $postsuper_path)
+        if [[ "$postsuper_permissions" == *x ]]; then
+            echo "Warning: $postsuper_path has execute permission for others."
+            read -p "Do you want to remove the execute permission for others? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                chmod o-x $postsuper_path
+                echo "Removed execute permission for others on $postsuper_path."
+            else
+                echo "Skipped changing permissions for $postsuper_path."
+            fi
+        else
+            echo "$postsuper_path permissions are correct."
+        fi
+    else
+        echo "Warning: $postsuper_path does not exist."
+    fi
+}
+
+srv_026() {
+    echo "Checking root remote login restriction (srv-026):"
+
+    sshd_config_file="/etc/ssh/sshd_config"
+    alt_sshd_config_file="/opt/ssh/etc/sshd_config"
+
+    check_sshd_config() {
+        config_file=$1
+        if [ -f $config_file ]; then
+            echo "$config_file exists."
+            if grep -q '^#PermitRootLogin' $config_file; then
+                echo "Warning: PermitRootLogin option is commented out in $config_file."
+                read -p "Do you want to set 'PermitRootLogin no' in $config_file? (yes/no): " response
+                if [ "$response" == "yes" ]; then
+                    sed -i.bak '/^#PermitRootLogin/ s/#PermitRootLogin.*/PermitRootLogin no/' $config_file
+                    systemctl restart sshd
+                    echo "Set 'PermitRootLogin no' in $config_file and restarted SSH service."
+                else
+                    echo "Skipped setting 'PermitRootLogin no' in $config_file."
+                fi
+            elif grep -q '^PermitRootLogin yes' $config_file; then
+                echo "Warning: PermitRootLogin is set to yes in $config_file."
+                read -p "Do you want to change it to 'PermitRootLogin no'? (yes/no): " response
+                if [ "$response" == "yes" ]; then
+                    sed -i.bak '/^PermitRootLogin yes/ s/PermitRootLogin yes/PermitRootLogin no/' $config_file
+                    systemctl restart sshd
+                    echo "Changed 'PermitRootLogin yes' to 'PermitRootLogin no' in $config_file and restarted SSH service."
+                else
+                    echo "Skipped changing 'PermitRootLogin yes' to 'PermitRootLogin no' in $config_file."
+                fi
+            else
+                echo "PermitRootLogin is properly set in $config_file."
+            fi
+        else
+            echo "Warning: $config_file does not exist."
+        fi
+    }
+
+}
+srv_063() {
+    echo "Checking DNS recursive query settings (srv-063):"
+
+    named_config_file="/etc/named.conf"
+
+    # DNS 프로세스 확인
+    named_process=$(ps -ef | grep named | grep -v grep)
+    if [ -z "$named_process" ]; then
+        echo "DNS service is not running."
+        return
+    else
+        echo "DNS service is running:"
+        echo "$named_process"
+    fi
+
+    # /etc/named.conf 파일 확인
+    if [ -f $named_config_file ]; then
+        echo "$named_config_file exists."
+        if grep -q 'recursion yes' $named_config_file; then
+            echo "Warning: DNS is configured to allow recursive queries."
+            read -p "Do you want to set 'recursion no' in $named_config_file? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                sed -i.bak '/recursion yes/ s/recursion yes/recursion no/' $named_config_file
+                systemctl restart named
+                echo "Set 'recursion no' in $named_config_file and restarted DNS service."
+            else
+                echo "Skipped setting 'recursion no' in $named_config_file."
+            fi
+        else
+            echo "DNS is not configured to allow recursive queries."
+        fi
+    else
+        echo "Warning: $named_config_file does not exist."
+    fi
+}
+srv_064() {
+    echo "Checking for vulnerable version of DNS service (srv-064):"
+
+    # BIND 버전 확인
+    bind_version=$(named -v 2>/dev/null | awk '{print $2}')
+    if [ -z "$bind_version" ]; then
+        echo "BIND service is not running or not installed."
+        return
+    else
+        echo "BIND version: $bind_version"
+    fi
+
+    # 취약한 버전 확인
+    vulnerable_versions=("9.11.4-P2")
+    secure_versions=("9.11.22" "9.16.6" "9.17.4")
+
+    for v in "${vulnerable_versions[@]}"; do
+        if [[ "$bind_version" == *"$v"* ]]; then
+            echo "Warning: You are using a vulnerable version of BIND ($bind_version)."
+            echo "It is recommended to upgrade to one of the following versions: ${secure_versions[*]}"
+
+            read -p "Do you want to upgrade BIND now? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                # 업그레이드 명령어 (예: yum 사용)
+                echo "Upgrading BIND..."
+                yum update bind -y
+                echo "BIND upgraded. Please check the version again."
+            else
+                echo "Skipped upgrading BIND."
+            fi
+            return
+        fi
+    done
+
+    echo "BIND version is not vulnerable."
+}
+srv_066() {
+    echo "Checking DNS zone transfer settings (srv-066):"
+
+    named_config_file="/etc/named.conf"
+    rfc1912_zones_file="/etc/named.rfc1912.zones"
+    named_boot_file="/etc/named.boot"
+
+    # DNS 프로세스 확인
+    named_process=$(ps -ef | grep named | grep -v grep)
+    if [ -z "$named_process" ]; then
+        echo "DNS service is not running."
+        return
+    else
+        echo "DNS service is running:"
+        echo "$named_process"
+    fi
+
+    # /etc/named.conf 파일의 allow-transfer 설정 확인
+    if [ -f $named_config_file ]; then
+        echo "$named_config_file exists."
+        if ! grep -q 'allow-transfer' $named_config_file; then
+            echo "Warning: allow-transfer setting is not found in $named_config_file."
+            read -p "Do you want to add 'allow-transfer { none; };' to $named_config_file? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                sed -i.bak '/options {/a\        allow-transfer { none; };' $named_config_file
+                systemctl restart named
+                echo "Added 'allow-transfer { none; };' to $named_config_file and restarted DNS service."
+            else
+                echo "Skipped adding 'allow-transfer { none; };' to $named_config_file."
+            fi
+        else
+            echo "allow-transfer setting is found in $named_config_file."
+        fi
+    else
+        echo "Warning: $named_config_file does not exist."
+    fi
+
+    # /etc/named.rfc1912.zones 파일의 allow-transfer 설정 확인
+    if [ -f $rfc1912_zones_file ]; then
+        echo "$rfc1912_zones_file exists."
+        if ! grep -q 'allow-transfer' $rfc1912_zones_file; then
+            echo "Warning: allow-transfer setting is not found in $rfc1912_zones_file."
+            read -p "Do you want to add 'allow-transfer { none; };' to $rfc1912_zones_file? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                echo "allow-transfer { none; };" >> $rfc1912_zones_file
+                systemctl restart named
+                echo "Added 'allow-transfer { none; };' to $rfc1912_zones_file and restarted DNS service."
+            else
+                echo "Skipped adding 'allow-transfer { none; };' to $rfc1912_zones_file."
+            fi
+        else
+            echo "allow-transfer setting is found in $rfc1912_zones_file."
+        fi
+    else
+        echo "Warning: $rfc1912_zones_file does not exist."
+    fi
+
+    # /etc/named.boot 파일의 xfrnets 설정 확인
+    if [ -f $named_boot_file ]; then
+        echo "$named_boot_file exists."
+        if ! grep -q 'xfrnets' $named_boot_file; then
+            echo "Warning: xfrnets setting is not found in $named_boot_file."
+            read -p "Do you want to add 'xfrnets 0.0.0.0/0;' to $named_boot_file? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                echo "xfrnets 0.0.0.0/0;" >> $named_boot_file
+                systemctl restart named
+                echo "Added 'xfrnets 0.0.0.0/0;' to $named_boot_file and restarted DNS service."
+            else
+                echo "Skipped adding 'xfrnets 0.0.0.0/0;' to $named_boot_file."
+            fi
+        else
+            echo "xfrnets setting is found in $named_boot_file."
+        fi
+    else
+        echo "Warning: $named_boot_file does not exist."
+    fi
+}
+
 srv_081() {
     echo "Checking cron and at file permissions (srv-081):"
 
@@ -218,6 +481,97 @@ srv_087() {
     check_compiler_permission "gcc"
     check_compiler_permission "cc"
 }
+srv_092() {
+    echo "Checking user home directory settings (srv-092):"
+
+    # 사용자 목록 가져오기
+    users=$(awk -F: '$7 != "/sbin/nologin" && $7 != "/usr/sbin/nologin" && $7 != "/bin/false" {print $1":"$6":"$7}' /etc/passwd)
+
+    for user_info in $users; do
+        IFS=':' read -r username homedir shell <<< "$user_info"
+        
+        # 홈 디렉터리 존재 여부 확인
+        if [ ! -d "$homedir" ]; then
+            echo "Warning: Home directory for user $username does not exist."
+            read -p "Do you want to create the home directory $homedir for user $username? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                mkdir -p "$homedir"
+                chown "$username":"$username" "$homedir"
+                chmod 700 "$homedir"
+                echo "Created home directory $homedir for user $username."
+            else
+                echo "Skipped creating home directory $homedir for user $username."
+            fi
+        else
+            echo "Home directory for user $username exists."
+        fi
+
+        # 홈 디렉터리 소유자 확인
+        owner=$(stat -c '%U' "$homedir")
+        if [ "$owner" != "$username" ]; then
+            echo "Warning: Owner of home directory $homedir is not $username."
+            read -p "Do you want to change the owner of $homedir to $username? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                chown "$username":"$username" "$homedir"
+                echo "Changed owner of home directory $homedir to $username."
+            else
+                echo "Skipped changing owner of home directory $homedir."
+            fi
+        else
+            echo "Owner of home directory $homedir is correct."
+        fi
+
+        # others 쓰기 권한 확인
+        permissions=$(stat -c '%A' "$homedir")
+        if [[ "$permissions" == *"w"* ]]; then
+            echo "Warning: Home directory $homedir has write permission for others."
+            read -p "Do you want to remove write permission for others from $homedir? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                chmod o-w "$homedir"
+                echo "Removed write permission for others from $homedir."
+            else
+                echo "Skipped removing write permission for others from $homedir."
+            fi
+        else
+            echo "Home directory $homedir does not have write permission for others."
+        fi
+    done
+}
+
+srv_095() {
+    echo "Checking for files with non-existent owners and groups (srv-095):"
+
+    # 존재하지 않는 사용자 및 그룹을 가진 파일 찾기
+    find / -xdev \( -nouser -o -nogroup \) -print > /tmp/non_existent_owners.txt
+
+    if [ ! -s /tmp/non_existent_owners.txt ]; then
+        echo "No files with non-existent owners or groups found."
+        rm /tmp/non_existent_owners.txt
+        return
+    fi
+
+    echo "Files with non-existent owners or groups:"
+    head -n 10 /tmp/non_existent_owners.txt
+    echo "..."
+    echo "Full list is saved in /tmp/non_existent_owners.txt."
+
+    read -p "Do you want to change the owner of these files to a valid user? (yes/no): " response
+    if [ "$response" == "yes" ]; then
+        read -p "Enter the username to set as the new owner: " new_owner
+        if id -u "$new_owner" >/dev/null 2>&1; then
+            while IFS= read -r file; do
+                chown "$new_owner":"$new_owner" "$file"
+                echo "Changed owner of $file to $new_owner."
+            done < /tmp/non_existent_owners.txt
+        else
+            echo "User $new_owner does not exist."
+        fi
+    else
+        echo "Skipped changing the owner of files."
+    fi
+
+    rm /tmp/non_existent_owners.txt
+}
 
 
 srv_096() {
@@ -276,6 +630,78 @@ srv_133() {
         fi
     fi
 }
+srv_163() {
+    echo "Checking system usage warning banner settings (srv-163):"
+
+    sshd_config_file="/etc/ssh/sshd_config"
+    issue_net_file="/etc/issue.net"
+    issue_file="/etc/issue"
+    motd_file="/etc/motd"
+
+    # SSH 배너 설정 확인
+    if [ -f $sshd_config_file ]; then
+        echo "$sshd_config_file exists."
+        if ! grep -q '^Banner' $sshd_config_file; then
+            echo "Warning: SSH banner is not set in $sshd_config_file."
+            read -p "Do you want to set the SSH banner? (yes/no): " response
+            if [ "$response" == "yes" ]; then
+                echo "Banner /etc/issue.net" >> $sshd_config_file
+                systemctl restart sshd
+                echo "Set 'Banner /etc/issue.net' in $sshd_config_file and restarted SSH service."
+            else
+                echo "Skipped setting SSH banner."
+            fi
+        else
+            echo "SSH banner is already set in $sshd_config_file."
+        fi
+    else
+        echo "Warning: $sshd_config_file does not exist."
+    fi
+
+    # /etc/issue.net 파일 설정 확인
+    if [ ! -f $issue_net_file ]; then
+        echo "Warning: $issue_net_file does not exist."
+        read -p "Do you want to create /etc/issue.net with a default warning message? (yes/no): " response
+        if [ "$response" == "yes" ]; then
+            echo "Authorized users only. All activity may be monitored and reported." > $issue_net_file
+            echo "Created $issue_net_file with a default warning message."
+        else
+            echo "Skipped creating $issue_net_file."
+        fi
+    else
+        echo "$issue_net_file exists."
+    fi
+
+    # /etc/issue 파일 설정 확인
+    if [ ! -f $issue_file ]; then
+        echo "Warning: $issue_file does not exist."
+        read -p "Do you want to create /etc/issue with a default warning message? (yes/no): " response
+        if [ "$response" == "yes" ]; then
+            echo "Authorized users only. All activity may be monitored and reported." > $issue_file
+            echo "Created $issue_file with a default warning message."
+        else
+            echo "Skipped creating $issue_file."
+        fi
+    else
+        echo "$issue_file exists."
+    fi
+
+    # /etc/motd 파일 설정 확인
+    if [ ! -f $motd_file ]; then
+        echo "Warning: $motd_file does not exist."
+        read -p "Do you want to create /etc/motd with a default warning message? (yes/no): " response
+        if [ "$response" == "yes" ]; then
+            echo "Authorized users only. All activity may be monitored and reported." > $motd_file
+            echo "Created $motd_file with a default warning message."
+        else
+            echo "Skipped creating $motd_file."
+        fi
+    else
+        echo "$motd_file exists."
+    fi
+}
+
+#!/bin/bash
 
 # 메뉴 출력
 echo "점검 항목을 선택하세요:"
@@ -283,10 +709,21 @@ echo "1001. CPU 사용률 점검"
 echo "1002. 메모리 사용률 점검"
 echo "1003. 디스크 사용률 점검"
 echo "1. srv-001 점검 (SNMP Community String 설정 확인)"
+echo "4. srv-004 점검 (불필요한 SMTP 서비스 실행)"
+echo "5. srv-005 점검 (SMTP 서비스의 expn/vrfy 명령어 실행 제한 미비)"
+echo "7. srv-007 점검 (취약한 버전의 SMTP 서비스 사용)"
+echo "10. srv-010 점검 (SMTP 서비스의 메일 queue 처리 권한 설정 미흡)"
+echo "26. srv-026 점검 (root 계정 원격 접속 제한 미비)"
+echo "63. srv-063 점검 (DNS Recursive Query 설정 미흡)"
+echo "64. srv-064 점검 (취약한 버전의 DNS 서비스 사용)"
+echo "66. srv-066 점검 (DNS Zone Transfer 설정 미흡)"
 echo "81. srv-081 점검 (cron 파일 권한 확인)"
 echo "87. srv-087 점검 (C 컴파일러 권한 확인)"
+echo "92. srv-92 점검 (사용자 홈 디렉터리 설정 미흡)"
+echo "95. srv-95 점검 (존재하지 않는 소유자 및 그룹 권한을 가진 파일 또는 디렉터리 존재)"
 echo "96. srv-096 점검 (사용자 환경파일 권한 확인)"
 echo "133. srv-133 점검 (Cron 서비스 계정 제한)"
+echo "163. srv-163 점검 (시스템 사용 주의사항 미출력)"
 
 # 사용자 입력 받기
 read -p "선택: " choice
@@ -302,14 +739,53 @@ case $choice in
     1003)
         test_3
         ;;
+    1)
+        srv_001
+        ;;
+    4)
+        srv_004
+        ;;
+    5)
+        srv_005
+        ;;
+    7)
+        srv_007
+        ;;
+    10)
+        srv_010
+        ;;
+    26)
+        srv_026
+        ;;
+    63)
+        srv_063
+        ;;
+    64)
+        srv_064
+        ;;
+    66)
+        srv_066
+        ;;
     81)
         srv_081
         ;;
     87)
         srv_087
         ;;
+    92)
+        srv_092
+        ;;
+    95)
+        srv_095
+        ;;
     96)
         srv_096
+        ;;
+    133)
+        srv_133
+        ;;
+    163)
+        srv_163
         ;;
     *)
         echo "잘못된 선택입니다."
@@ -317,3 +793,4 @@ case $choice in
 esac
 
 echo "점검 완료"
+
