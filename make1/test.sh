@@ -71,6 +71,7 @@ srv_004() {
     smtp_port=$(netstat -lnt | grep ':25 ')
     if [ -n "$smtp_port" ]; then
         echo "SMTP service is listening on port 25."
+        echo "SMTP 관련 서비스 postfix,sendmail,exim stop & disable."
         read -p "Do you want to stop the SMTP service? (yes/no): " response
         if [ "$response" == "yes" ]; then
             if [[ "$smtp_process" == *"postfix"* ]]; then
@@ -156,6 +157,7 @@ srv_007() {
             # 업그레이드 명령어 (예: yum 사용)
             echo "Upgrading Postfix..."
             echo "YUM 을 사용할 수 없습니다"
+            echo "Skipped upgrading Postfix."
             # yum update postfix -y
             # echo "Postfix upgraded. Please check the version again."
         else
