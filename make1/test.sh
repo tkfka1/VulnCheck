@@ -28,8 +28,7 @@ srv_001() {
         echo "SNMP service is active on UDP port 161."
     fi
 
-    if [ -f /etc/snmp/snmpd.conf ]; then
-        echo "/etc/snmp/snmpd.conf exists."
+    if [ -f /etc/snmp/snmpd.conf ]; then echo "/etc/snmp/snmpd.conf exists."
         community_strings=$(grep -E 'community|com2sec' /etc/snmp/snmpd.conf)
         if [ -z "$community_strings" ]; then
             echo "No SNMP Community Strings found in /etc/snmp/snmpd.conf."
