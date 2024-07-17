@@ -28,7 +28,8 @@ srv_001() {
         echo "SNMP service is active on UDP port 161."
     fi
 
-    if [ -f /etc/snmp/snmpd.conf ]; then echo "/etc/snmp/snmpd.conf exists."
+    if [ -f /etc/snmp/snmpd.conf ]; then
+        echo "/etc/snmp/snmpd.conf exists."
         community_strings=$(grep -E 'community|com2sec' /etc/snmp/snmpd.conf)
         if [ -z "$community_strings" ]; then
             echo "No SNMP Community Strings found in /etc/snmp/snmpd.conf."
@@ -116,7 +117,7 @@ srv_005() {
             echo "Warning: Postfix is not configured to disable VRFY command."
             read -p "Do you want to add 'disable_vrfy_command = yes' to /etc/postfix/main.cf? (yes/no): " response
             if [ "$response" == "yes" ]; then
-                echo "disable_vrfy_command = yes" >> /etc/postfix/main.cf
+                echo "disable_vrfy_command = yes" >>/etc/postfix/main.cf
                 systemctl restart postfix
                 echo "Added 'disable_vrfy_command = yes' and restarted Postfix."
             else
@@ -358,7 +359,7 @@ srv_066() {
             echo "Warning: allow-transfer setting is not found in $rfc1912_zones_file."
             read -p "Do you want to add 'allow-transfer { none; };' to $rfc1912_zones_file? (yes/no): " response
             if [ "$response" == "yes" ]; then
-                echo "allow-transfer { none; };" >> $rfc1912_zones_file
+                echo "allow-transfer { none; };" >>$rfc1912_zones_file
                 systemctl restart named
                 echo "Added 'allow-transfer { none; };' to $rfc1912_zones_file and restarted DNS service."
             else
@@ -378,7 +379,7 @@ srv_066() {
             echo "Warning: xfrnets setting is not found in $named_boot_file."
             read -p "Do you want to add 'xfrnets 0.0.0.0/0;' to $named_boot_file? (yes/no): " response
             if [ "$response" == "yes" ]; then
-                echo "xfrnets 0.0.0.0/0;" >> $named_boot_file
+                echo "xfrnets 0.0.0.0/0;" >>$named_boot_file
                 systemctl restart named
                 echo "Added 'xfrnets 0.0.0.0/0;' to $named_boot_file and restarted DNS service."
             else
@@ -458,7 +459,7 @@ srv_087() {
 
     check_compiler_permission() {
         compiler=$1
-        if command -v $compiler &> /dev/null; then
+        if command -v $compiler &>/dev/null; then
             compiler_path=$(command -v $compiler)
             echo "$compiler found at $compiler_path."
             ls -l $compiler_path
@@ -489,8 +490,8 @@ srv_092() {
     users=$(awk -F: '$7 != "/sbin/nologin" && $7 != "/usr/sbin/nologin" && $7 != "/bin/false" {print $1":"$6":"$7}' /etc/passwd)
 
     for user_info in $users; do
-        IFS=':' read -r username homedir shell <<< "$user_info"
-        
+        IFS=':' read -r username homedir shell <<<"$user_info"
+
         # 홈 디렉터리 존재 여부 확인
         if [ ! -d "$homedir" ]; then
             echo "Warning: Home directory for user $username does not exist."
@@ -543,7 +544,7 @@ srv_095() {
     echo "Checking for files with non-existent owners and groups (srv-095):"
 
     # 존재하지 않는 사용자 및 그룹을 가진 파일 찾기
-    find / -xdev \( -nouser -o -nogroup \) -print > /tmp/non_existent_owners.txt
+    find / -xdev \( -nouser -o -nogroup \) -print >/tmp/non_existent_owners.txt
 
     if [ ! -s /tmp/non_existent_owners.txt ]; then
         echo "No files with non-existent owners or groups found."
@@ -563,7 +564,7 @@ srv_095() {
             while IFS= read -r file; do
                 chown "$new_owner":"$new_owner" "$file"
                 echo "Changed owner of $file to $new_owner."
-            done < /tmp/non_existent_owners.txt
+            done </tmp/non_existent_owners.txt
         else
             echo "User $new_owner does not exist."
         fi
@@ -573,7 +574,6 @@ srv_095() {
 
     rm /tmp/non_existent_owners.txt
 }
-
 
 srv_096() {
     echo "Checking user environment file permissions (srv-096):"
@@ -610,7 +610,6 @@ srv_096() {
     done
 }
 
-
 srv_133() {
     echo "Checking cron service account restrictions (srv-133):"
 
@@ -646,7 +645,7 @@ srv_163() {
             echo "Warning: SSH banner is not set in $sshd_config_file."
             read -p "Do you want to set the SSH banner? (yes/no): " response
             if [ "$response" == "yes" ]; then
-                echo "Banner /etc/issue.net" >> $sshd_config_file
+                echo "Banner /etc/issue.net" >>$sshd_config_file
                 systemctl restart sshd
                 echo "Set 'Banner /etc/issue.net' in $sshd_config_file and restarted SSH service."
             else
@@ -664,7 +663,7 @@ srv_163() {
         echo "Warning: $issue_net_file does not exist."
         read -p "Do you want to create /etc/issue.net with a default warning message? (yes/no): " response
         if [ "$response" == "yes" ]; then
-            echo "Authorized users only. All activity may be monitored and reported." > $issue_net_file
+            echo "Authorized users only. All activity may be monitored and reported." >$issue_net_file
             echo "Created $issue_net_file with a default warning message."
         else
             echo "Skipped creating $issue_net_file."
@@ -678,7 +677,7 @@ srv_163() {
         echo "Warning: $issue_file does not exist."
         read -p "Do you want to create /etc/issue with a default warning message? (yes/no): " response
         if [ "$response" == "yes" ]; then
-            echo "Authorized users only. All activity may be monitored and reported." > $issue_file
+            echo "Authorized users only. All activity may be monitored and reported." >$issue_file
             echo "Created $issue_file with a default warning message."
         else
             echo "Skipped creating $issue_file."
@@ -692,7 +691,7 @@ srv_163() {
         echo "Warning: $motd_file does not exist."
         read -p "Do you want to create /etc/motd with a default warning message? (yes/no): " response
         if [ "$response" == "yes" ]; then
-            echo "Authorized users only. All activity may be monitored and reported." > $motd_file
+            echo "Authorized users only. All activity may be monitored and reported." >$motd_file
             echo "Created $motd_file with a default warning message."
         else
             echo "Skipped creating $motd_file."
@@ -731,67 +730,66 @@ read -p "선택: " choice
 
 # 선택에 따라 함수 실행
 case $choice in
-    1001)
-        test_1
-        ;;
-    1002)
-        test_2
-        ;;
-    1003)
-        test_3
-        ;;
-    1)
-        srv_001
-        ;;
-    4)
-        srv_004
-        ;;
-    5)
-        srv_005
-        ;;
-    7)
-        srv_007
-        ;;
-    10)
-        srv_010
-        ;;
-    26)
-        srv_026
-        ;;
-    63)
-        srv_063
-        ;;
-    64)
-        srv_064
-        ;;
-    66)
-        srv_066
-        ;;
-    81)
-        srv_081
-        ;;
-    87)
-        srv_087
-        ;;
-    92)
-        srv_092
-        ;;
-    95)
-        srv_095
-        ;;
-    96)
-        srv_096
-        ;;
-    133)
-        srv_133
-        ;;
-    163)
-        srv_163
-        ;;
-    *)
-        echo "잘못된 선택입니다."
-        ;;
+1001)
+    test_1
+    ;;
+1002)
+    test_2
+    ;;
+1003)
+    test_3
+    ;;
+1)
+    srv_001
+    ;;
+4)
+    srv_004
+    ;;
+5)
+    srv_005
+    ;;
+7)
+    srv_007
+    ;;
+10)
+    srv_010
+    ;;
+26)
+    srv_026
+    ;;
+63)
+    srv_063
+    ;;
+64)
+    srv_064
+    ;;
+66)
+    srv_066
+    ;;
+81)
+    srv_081
+    ;;
+87)
+    srv_087
+    ;;
+92)
+    srv_092
+    ;;
+95)
+    srv_095
+    ;;
+96)
+    srv_096
+    ;;
+133)
+    srv_133
+    ;;
+163)
+    srv_163
+    ;;
+*)
+    echo "잘못된 선택입니다."
+    ;;
 esac
 
 echo "점검 완료"
-
