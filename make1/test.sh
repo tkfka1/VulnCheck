@@ -17,6 +17,8 @@ test_3() {
     echo "디스크 사용률 점검:"
     df -h | awk '$NF=="/"{printf "  Used: %dGB (%.2f%%)\n", $3, $5}'
 }
+
+## snmp 비활성화로 조치해야함
 srv_001() {
     echo "Checking SNMP Community String settings (srv-001):"
 
